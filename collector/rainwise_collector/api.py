@@ -36,6 +36,7 @@ def config_from_env() -> Config:
         poll_seconds=float(os.environ.get("POLL_SECONDS", "5")),
         tz=os.environ.get("TZ") or None,
         min_rssi=float(os.environ.get("MIN_RSSI", "-115")),
+        stale_minutes=float(os.environ.get("STALE_MINUTES", "30")),
     )
 
 

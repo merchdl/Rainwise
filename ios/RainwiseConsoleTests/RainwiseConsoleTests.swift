@@ -14,7 +14,8 @@ final class RainwiseConsoleTests: XCTestCase {
               "recent": [{"sector": 10, "weight": 1.0}, {"sector": 11, "weight": 0.5}]},
      "rain": {"hour": 0.0, "day": 0.0, "month": 0.0, "year": 0.91},
      "today": {"temperature": {"min": 4.1, "min_time": 1793505600, "max": 4.3, "max_time": 1793505999}},
-     "timezone": "America/New_York"}
+     "timezone": "America/New_York",
+     "warnings": ["Humidity sensor reads 0% (sensor failed or disconnected)"]}
     """
 
     func testDecodeCurrent() throws {
@@ -25,6 +26,8 @@ final class RainwiseConsoleTests: XCTestCase {
         XCTAssertEqual(c.wind.recent.count, 2)
         XCTAssertEqual(c.today["temperature"]?.maxTime, 1793505999)
         XCTAssertNil(c.outside.solar)
+        XCTAssertEqual(c.warnings?.count, 1)
+        XCTAssertNil(c.station.frozenMinutes)
     }
 
     func testDecodeHistory() throws {

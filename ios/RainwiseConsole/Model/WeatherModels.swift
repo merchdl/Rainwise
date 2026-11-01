@@ -15,12 +15,19 @@ struct CurrentConditions: Decodable, Equatable {
     var rain: Rain
     var today: [String: Extreme]
     var timezone: String?
+    /// Sensor problems spotted by the collector, e.g. a dead humidity sensor.
+    var warnings: [String]? = nil
 
     struct Station: Decodable, Equatable {
         var signalOk: Bool
         var rssi: Double?
         var signalQuality: Double?
         var battery: Double?
+        /// Set when readings have been frozen long enough that the IP-100 has
+        /// probably stopped hearing the station.
+        var frozenMinutes: Int? = nil
+        var clock: String? = nil
+        var firmware: String? = nil
     }
 
     struct Outside: Decodable, Equatable {

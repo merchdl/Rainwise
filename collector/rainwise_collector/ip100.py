@@ -1,23 +1,32 @@
 """Read and parse the Rainwise IP-100's ``/status.xml`` endpoint.
 
-The IP-100 serves a small XML document shaped roughly like::
+Firmware 1083 serves (min/max are for the current day)::
 
     <status>
       <hardware>
+        <firmware_version>1083</firmware_version>
+        <clock>2026/11/01 09:44:29</clock>
+        <station_volts>6.6</station_volts>
+        <network>...</network>
+        <interval>1</interval>
         <base_units>English</base_units>
-        ...signal / firmware / battery fields...
+        <speed_units>mph</speed_units>
       </hardware>
       <weather>
-        <temperature_outside><current>36.7</current>...</temperature_outside>
-        <humidity><current>64</current>...</humidity>
+        <temperature_outside><current>43.6</current><max>43.6</max><min>43.6</min></temperature_outside>
+        <humidity>...</humidity>
+        <pressure>...</pressure>
+        <precipitation><current>0.00</current></precipitation>
         <wind>
-          <speed>2</speed><direction>270</direction>
-          <gust_speed>5</gust_speed><gust_direction>280</gust_direction>
+          <speed>3.0</speed><direction>225</direction>
+          <gust_speed>3.0</gust_speed><gust_direction>0</gust_direction>
         </wind>
-        <precipitation><current>0.00</current>...</precipitation>
-        ...
+        <temperature_inside>...</temperature_inside>
       </weather>
     </status>
+
+It has no radio-signal fields (the web page's "Rx Signal" isn't in the XML);
+the collector detects a lost station by readings that stop changing instead.
 
 Firmware versions differ in the exact child elements, so parsing is tolerant:
 we read what we recognise and keep everything else in ``raw`` so it can be
@@ -53,6 +62,10 @@ class Sample:
     rssi: float | None = None  # dBm, if the firmware reports it
     signal_quality: float | None = None
     base_units: str = "English"
+    speed_units: str = "mph"
+    clock: str | None = None  # IP-100's own clock, as reported
+    firmware: str | None = None
+    warnings: list[str] = field(default_factory=list)
     hardware: dict[str, str] = field(default_factory=dict)
     raw: dict[str, dict[str, str]] = field(default_factory=dict)
 
@@ -106,6 +119,9 @@ def parse_status_xml(data: bytes | str) -> Sample:
     if hw is not None:
         s.hardware = _flatten(hw)
         s.base_units = s.hardware.get("base_units", "English") or "English"
+        s.speed_units = s.hardware.get("speed_units", "mph") or "mph"
+        s.clock = s.hardware.get("clock") or None
+        s.firmware = s.hardware.get("firmware_version") or None
         for key, value in s.hardware.items():
             leaf = key.rsplit(".", 1)[-1].lower()
             if leaf in ("station_volts", "battery", "station_battery"):
@@ -136,7 +152,38 @@ def parse_status_xml(data: bytes | str) -> Sample:
 
     if s.base_units.lower() != "english":
         _metric_to_us(s)
+    _speed_to_mph(s)
+    _sanity(s)
     return s
+
+
+_SPEED_TO_MPH = {"mph": 1.0, "kph": 0.621371, "km/h": 0.621371, "kmh": 0.621371,
+                 "knots": 1.150779, "kts": 1.150779, "m/s": 2.236936, "mps": 2.236936}
+
+
+def _speed_to_mph(s: Sample) -> None:
+    factor = _SPEED_TO_MPH.get(s.speed_units.strip().lower())
+    if factor is None:
+        log.warning("unknown speed_units %r; assuming mph", s.speed_units)
+        return
+    if factor != 1.0:
+        s.wind_speed = None if s.wind_speed is None else s.wind_speed * factor
+        s.gust_speed = None if s.gust_speed is None else s.gust_speed * factor
+
+
+def _sanity(s: Sample) -> None:
+    """Drop values the hardware reports that can't be real."""
+    # Outdoor RH is never 0 %; the MK-III reports 0 when its humidity sensor
+    # has failed or is disconnected. Treat it as missing, not as data.
+    if s.humidity is not None and s.humidity <= 0:
+        s.humidity = None
+        s.warnings.append("Humidity sensor reads 0% (sensor failed or disconnected)")
+    elif s.humidity is not None and s.humidity > 100:
+        s.humidity = 100.0
+    # North is reported as 360; 0 means "no direction" (e.g. gust_direction
+    # when there has been no gust above the average).
+    if s.gust_dir == 0:
+        s.gust_dir = None
 
 
 def _metric_to_us(s: Sample) -> None:
@@ -144,7 +191,8 @@ def _metric_to_us(s: Sample) -> None:
 
     The collector stores everything in US units and the app converts for
     display. Units set to "Metric" on the IP-100 are assumed to be °C, hPa,
-    km/h and mm. If your unit disagrees, set it back to US (English).
+    and mm (wind uses the separate speed_units field). If your unit disagrees,
+    set it back to US (English).
     """
 
     def c_to_f(v):
@@ -154,10 +202,6 @@ def _metric_to_us(s: Sample) -> None:
     s.in_temp = c_to_f(s.in_temp)
     if s.pressure is not None:
         s.pressure = s.pressure * 0.0295299830714
-    for attr in ("wind_speed", "gust_speed"):
-        v = getattr(s, attr)
-        if v is not None:
-            setattr(s, attr, v * 0.621371)
     if s.rain_day is not None:
         s.rain_day = s.rain_day / 25.4
 

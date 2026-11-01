@@ -33,11 +33,13 @@ def heat_index_f(temp_f: float | None, rh: float | None) -> float | None:
     At or below 70 °F humidity has no meaningful effect and THI equals the air
     temperature; between that and 80 °F the simple Steadman form is used.
     """
-    if temp_f is None or rh is None:
+    if temp_f is None:
+        return None
+    if temp_f <= 70:
+        return temp_f
+    if rh is None:
         return None
     t, r = temp_f, rh
-    if t <= 70:
-        return t
     simple = 0.5 * (t + 61.0 + (t - 68.0) * 1.2 + r * 0.094)
     if (simple + t) / 2 < 80:
         return simple

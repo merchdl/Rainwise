@@ -22,8 +22,8 @@ MK-III ──RF──▶ IP-100 (192.168.11.61) ──HTTP /status.xml──▶ 
 
 ## 1. Run the collector on Proxmox
 
-First check that the IP-100's data feed is reachable from the network the
-container will be on:
+The collector reads the IP-100's XML feed (tested against firmware 1083).
+First check that the feed is reachable from the network the container will be on:
 
 ```sh
 curl http://192.168.11.61/status.xml
@@ -64,7 +64,7 @@ journalctl -u rainwise-collector -f
 | `DB_PATH` | `/data/rainwise.db` | |
 | `PORT` | `8100` | |
 | `API_TOKEN` | *(none)* | If set, the app must send the same token |
-| `MIN_RSSI` | `-115` | Below this the IP-100 isn't hearing the station; readings aren't stored |
+| `STALE_MINUTES` | `30` | If temperature, pressure, wind and rain don't change for this long, the IP-100 is assumed to have lost the station and readings aren't stored |
 
 ### Away from home
 
@@ -129,3 +129,13 @@ connection**, then **Save**.
 
 The wind ring lights the current direction. Directions seen in the last 10
 minutes glow dimly.
+
+## Notes on the IP-100 data
+
+* `status.xml` carries no radio-signal level, so a lost station is detected
+  by readings freezing (see `STALE_MINUTES`).
+* A humidity of exactly 0% means the station's humidity sensor has failed or
+  is disconnected. The collector records it as missing, so dew point and
+  THI above 70 °F are blank, and the app shows a warning.
+* `gust_direction` of 0 means "no gust direction". The wind direction is
+  used instead. North is reported as 360.

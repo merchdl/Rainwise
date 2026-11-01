@@ -42,8 +42,13 @@ class Config:
     poll_seconds: float = 5.0
     tz: str | None = None
     # Below this RSSI (dBm), or at signal quality 0, the IP-100 is not hearing
-    # the station and its readings are stale/zero; they are not stored.
+    # the station. (Firmware 1083 doesn't report signal in status.xml, so this
+    # only applies to firmware that does.)
     min_rssi: float = -115.0
+    # If outside temperature, pressure, wind and rain all stay exactly the
+    # same for this long, assume the IP-100 has stopped hearing the station
+    # and is repeating its last values. Those readings are not stored.
+    stale_minutes: float = 30.0
 
 
 def _row_from_sample(s: Sample) -> dict[str, float | None]:
@@ -125,6 +130,8 @@ class Collector:
         self._today: date | None = None
         self._extremes: dict[str, dict] = {}
         self._rain_at_midnight: float | None = None
+        self._fingerprint: tuple | None = None
+        self._last_change_ts: float | None = None
         self._subscribers: set[asyncio.Queue] = set()
         self._task: asyncio.Task | None = None
 
@@ -163,9 +170,20 @@ class Collector:
 
     # ---- ingestion ----------------------------------------------------------
 
+    def stale_seconds(self, now: float | None = None) -> float:
+        """How long the station's readings have been frozen (0 if changing)."""
+        if self._last_change_ts is None or self.sample_ts is None:
+            return 0.0
+        return (now or self.sample_ts) - self._last_change_ts
+
+    def readings_frozen(self) -> bool:
+        return self.stale_seconds() >= self.cfg.stale_minutes * 60
+
     def signal_ok(self, s: Sample | None = None) -> bool:
         s = s or self.sample
         if s is None:
+            return False
+        if self.readings_frozen():
             return False
         if s.rssi is not None and s.rssi <= self.cfg.min_rssi:
             return False
@@ -183,6 +201,11 @@ class Collector:
 
         self.sample, self.sample_ts = s, ts
         self.row = _row_from_sample(s)
+
+        fp = (s.out_temp, s.pressure, s.wind_speed, s.wind_dir, s.gust_speed, s.rain_day)
+        if fp != self._fingerprint or self._last_change_ts is None:
+            self._fingerprint = fp
+            self._last_change_ts = ts
 
         if not self.signal_ok(s):
             # Don't record stale readings; the payload flags the problem.
@@ -302,7 +325,11 @@ class Collector:
                 "rssi": s.rssi if s else None,
                 "signal_quality": s.signal_quality if s else None,
                 "battery": r.get("battery"),
+                "frozen_minutes": round(self.stale_seconds() / 60) if self.readings_frozen() else None,
+                "clock": s.clock if s else None,
+                "firmware": s.firmware if s else None,
             },
+            "warnings": list(s.warnings) if s else [],
             "outside": {
                 "temperature": r.get("out_temp"),
                 "humidity": r.get("humidity"),

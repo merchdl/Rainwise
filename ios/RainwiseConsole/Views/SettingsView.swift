@@ -55,6 +55,11 @@ struct SettingsView: View {
                         if let r = c.station.rssi { LabeledContent("RSSI", value: "\(Int(r)) dBm") }
                         if let b = c.station.battery { LabeledContent("Station battery", value: String(format: "%.1f V", b)) }
                         if let tz = c.timezone { LabeledContent("Collector time zone", value: tz) }
+                        if let clock = c.station.clock { LabeledContent("IP-100 clock", value: clock) }
+                        if let fw = c.station.firmware { LabeledContent("IP-100 firmware", value: fw) }
+                        ForEach(c.warnings ?? [], id: \.self) { w in
+                            Label(w, systemImage: "exclamationmark.triangle").foregroundStyle(.yellow)
+                        }
                     }
                 }
             }

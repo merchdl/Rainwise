@@ -60,9 +60,16 @@ struct StatusBar: View {
                           message: "Collector can't reach the IP-100" + (c.error.map { ": \($0)" } ?? ""))
         }
         if !c.station.signalOk {
+            if let m = c.station.frozenMinutes {
+                return Status(icon: "antenna.radiowaves.left.and.right.slash", color: .orange,
+                              message: "Station readings haven't changed for \(m) min. The IP-100 may not be hearing the station.")
+            }
             let rssi = c.station.rssi.map { " (\(Int($0)) dBm)" } ?? ""
             return Status(icon: "antenna.radiowaves.left.and.right.slash", color: .orange,
                           message: "IP-100 isn't hearing the station\(rssi). Check the station's battery and antenna.")
+        }
+        if let warning = c.warnings?.first {
+            return Status(icon: "exclamationmark.triangle", color: .yellow, message: warning)
         }
         var msg = "IP-100"
         if let updated = c.updatedDate {

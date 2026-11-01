@@ -39,34 +39,38 @@ def synthetic(ts: float, seed: int = 0) -> Sample:
         humidity=round(humidity),
         pressure=round(29.9 + 0.25 * math.sin(day * 0.7), 2),
         wind_speed=round(wind),
-        wind_dir=round(direction),
+        wind_dir=round(direction) or 360,
         gust_speed=round(wind + rnd.uniform(0, 6)),
-        gust_dir=round(direction + rnd.uniform(-15, 15)) % 360,
+        gust_dir=(round(direction + rnd.uniform(-15, 15)) % 360) or 360,
         rain_day=rain_day,
-        battery=6.3,
-        rssi=-78,
-        signal_quality=100,
+        battery=6.6,
     )
 
 
 def to_xml(s: Sample) -> str:
-    def block(tag, v):
-        return f"<{tag}><current>{v}</current><high>{v}</high><low>{v}</low><average>{v}</average></{tag}>"
+    """Same layout as a real IP-100 on firmware 1083."""
 
+    def block(tag, v):
+        return f"\t<{tag}>\n\t\t<current>{v}</current>\n\t\t<max>{v}</max>\n\t\t<min>{v}</min>\n\t</{tag}>\n"
+
+    clock = datetime.now().strftime("%Y/%m/%d %H:%M:%S")
     return (
-        "<?xml version='1.0'?><status>"
-        "<hardware><base_units>English</base_units><firmware>sim</firmware>"
-        f"<rssi>{s.rssi}</rssi><signal_quality>{s.signal_quality}</signal_quality>"
-        f"<station_volts>{s.battery}</station_volts></hardware>"
-        "<weather>"
+        '<?xml version="1.0" encoding="ISO-8859-1"?>\n'
+        "<!-- Weather and hardware paramters for the IP-100, min's, max's and accumulations are for the current day -->\n"
+        "<status>\n <hardware>\n"
+        "   <serial_number></serial_number>\n   <firmware_version>sim</firmware_version>\n"
+        f"   <clock>{clock}</clock>\n   <station_volts>{s.battery}</station_volts>\n"
+        "   <network><IP_address>127.0.0.1</IP_address></network>\n"
+        "   <interval>1</interval>\n   <base_units>English</base_units>\n   <speed_units>mph</speed_units>\n"
+        " </hardware>\n <weather>\n"
         + block("temperature_outside", s.out_temp)
-        + block("temperature_inside", s.in_temp)
         + block("humidity", s.humidity)
         + block("pressure", s.pressure)
-        + f"<wind><speed>{s.wind_speed}</speed><direction>{s.wind_dir}</direction>"
-        f"<gust_speed>{s.gust_speed}</gust_speed><gust_direction>{s.gust_dir}</gust_direction></wind>"
-        + block("precipitation", s.rain_day)
-        + "</weather></status>"
+        + f"\t<precipitation>\n\t\t<current>{s.rain_day:.2f}</current>\n\t</precipitation>\n"
+        + f"\t<wind>\n\t\t<speed>{s.wind_speed}</speed>\n\t\t<direction>{s.wind_dir}</direction>\n"
+        f"\t\t<gust_speed>{s.gust_speed}</gust_speed>\n\t\t<gust_direction>{s.gust_dir}</gust_direction>\n\t</wind>\n"
+        + block("temperature_inside", s.in_temp)
+        + " </weather>\n</status>"
     )
 
 
