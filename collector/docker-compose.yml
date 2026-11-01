@@ -1,0 +1,14 @@
+services:
+  rainwise-collector:
+    build: .
+    container_name: rainwise-collector
+    restart: unless-stopped
+    ports:
+      - "8100:8100"
+    environment:
+      IP100_HOST: 192.168.11.61
+      POLL_SECONDS: "5"
+      TZ: America/New_York   # set to your time zone: it decides when "today" starts
+      # API_TOKEN: change-me  # optional; enter the same token in the app's settings
+    volumes:
+      - ./data:/data

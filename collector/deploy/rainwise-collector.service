@@ -1,0 +1,14 @@
+[Unit]
+Description=Rainwise IP-100 collector
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=rainwise
+EnvironmentFile=/etc/rainwise-collector.env
+ExecStart=/opt/rainwise-collector/venv/bin/rainwise-collector
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

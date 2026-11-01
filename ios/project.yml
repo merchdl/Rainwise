@@ -1,0 +1,73 @@
+# Generate the Xcode project with XcodeGen:
+#   brew install xcodegen
+#   cd ios && xcodegen
+#   open RainwiseConsole.xcodeproj
+name: RainwiseConsole
+options:
+  bundleIdPrefix: com.example.rainwise   # change to your own reverse-DNS prefix
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    DEVELOPMENT_TEAM: ""                 # or pick your team in Xcode > Signing & Capabilities
+    CODE_SIGN_STYLE: Automatic
+
+targets:
+  RainwiseConsole:
+    type: application
+    platform: iOS
+    sources:
+      - RainwiseConsole
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.rainwise.console
+        TARGETED_DEVICE_FAMILY: "1,2"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+    info:
+      path: RainwiseConsole/Info.plist
+      properties:
+        CFBundleDisplayName: Weather Console
+        UILaunchScreen: {}
+        UIApplicationSupportsIndirectInputEvents: true
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        NSLocalNetworkUsageDescription: Connects to your weather station collector on the local network.
+        # The collector speaks plain HTTP on your LAN / tailnet.
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
+          NSAllowsLocalNetworking: true
+
+  RainwiseConsoleTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - RainwiseConsoleTests
+    dependencies:
+      - target: RainwiseConsole
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.rainwise.console.tests
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  RainwiseConsole:
+    build:
+      targets:
+        RainwiseConsole: all
+        RainwiseConsoleTests: [test]
+    test:
+      targets:
+        - RainwiseConsoleTests
